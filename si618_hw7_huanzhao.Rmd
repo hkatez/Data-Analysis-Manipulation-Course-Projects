@@ -1,0 +1,108 @@
+---
+title: "SI 618 Homework 7"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Part 1 (40 points)
+###Question 1: Load country data (5 points)
+
+```{r echo=FALSE}
+library(ggplot2)
+library(grid)
+countrydata_withregion <- read.table("countrydata_withregion.tsv", 
+                   header = TRUE, fill = TRUE,sep="\t",quote = "")
+head(countrydata_withregion,15)
+```
+
+
+###Question 2: Scatter plot of log transformed data (5 points)
+
+```{r echo=FALSE,fig.width=7}
+qplot(x = log(countrydata_withregion$area,2), y = log(countrydata_withregion$population,2), 
+      xlab = 'Log base 2 of the area',ylab = 'Log base 2 of the population')
+```
+
+###Question 3: Data aggregation by region (15 points)
+
+```{r echo=FALSE}
+aggarea <- aggregate(countrydata_withregion$area,by=list(countrydata_withregion$region),FUN=sum)
+
+pie(aggarea$x,aggarea$Group.1,main="Area of Regions")
+```
+
+
+```{r echo=FALSE}
+aggpop <- aggregate(countrydata_withregion$population,by=list(countrydata_withregion$region),FUN=sum)
+
+pie(aggpop$x,aggpop$Group.1,main="Population of Regions")
+```
+
+###Question 4: Visualization of Population per sq km of Regions (15 points)
+
+```{r echo=FALSE}
+new_df <- data.frame(a = aggpop$Group.1, b = c(aggpop$x/aggarea$x))
+
+qplot(reorder(a, -b),data = new_df, geom = "bar", weight = b) + theme(axis.text.x = element_text(angle = 60, hjust = 1)) + xlab("Region") + ylab("Population per sq km of Regions")
+
+```
+
+
+###Part 2 (60 points)
+###Question 5: Load yelp data & generate summary (10 points)
+```{r echo=FALSE}
+
+business <- read.table("businessdata.tsv", header = TRUE, fill = TRUE,sep="\t",quote = "",comment.char = "")
+business <- na.omit(business)
+business$name <- toString(business$name)
+
+library(data.table)
+busdata_table = data.table(business)
+summary(busdata_table)
+
+
+```
+
+
+###Question 6: Histogram of Star Rating (10 points)
+```{r echo=FALSE}
+
+ggplot(business, aes(x=stars, color = state, fill = state)) + geom_histogram(binwidth = 1, alpha = 0.6) + facet_grid(. ~state) + xlab("Stars") + ggtitle("Histograms of Star Ratings") + theme(axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank())
+```
+
+###Question 7: Histograms of Review Counts (10 points)
+```{r echo=FALSE}
+ggplot(business, aes(x=review_count)) + geom_histogram(binwidth = 10, aes(fill = I("grey"), col = I("dark grey"))) + xlab("Review Counts") + ggtitle("Histograms of Review Counts") + theme(axis.title.y=element_blank())
+```
+
+```{r echo=FALSE}
+ggplot(subset(business, review_count <= 200), aes(x=review_count)) + geom_histogram(binwidth = 1, aes(fill = I("grey"), col = I("dark grey"))) + xlab("Review Counts") + ggtitle("Histograms of Review Counts (Filtered)") + theme(axis.title.y=element_blank())
+```
+
+###Question 8: Boxplot of Star Ratings by States (10 points)
+
+```{r echo=FALSE}
+ggplot(business, aes(x=state, y=stars, color = state, fill = state)) + geom_boxplot(alpha = 0.6) + ggtitle("Star Ratings by States") + ylab("Stars") + theme(axis.title.x=element_blank()) 
+
+```
+
+
+###Question 9: Bar Chart of Number of Businesses by State (10 points)
+
+```{r echo=FALSE}
+business$count = 1
+state <- aggregate(business$count, by=list(business$state), FUN=sum, na.rm=TRUE)
+state
+ggplot(state, aes(x = reorder(Group.1, -x), y=x)) + geom_bar(stat = "identity", alpha = 0.8) + xlab("State") + theme(axis.title.y=element_blank())
+
+```
+
+### R Appendix
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```

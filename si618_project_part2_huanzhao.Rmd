@@ -1,0 +1,194 @@
+---
+title: "si618_project_part2_huanzhao"
+author: "huanzhao"
+date: "December 8, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+# import dataset and libraries
+```{r echo=FALSE}
+library(ggplot2) 
+library(readr) 
+library(plotly)
+library(tidyverse)
+library(knitr)
+library(caret)
+library(cluster)
+
+beer <- read.csv("beers.csv" ,stringsAsFactors = FALSE, header = TRUE, na.strings=c("","-","NA"))
+brewery <- read.csv("breweries.csv", stringsAsFactors = FALSE, header = TRUE, na.strings=c("","-","NA"))
+
+
+```
+
+# task 1
+# correlations
+```{r echo=FALSE,fig.width=14}            
+# merging the two dataset
+merg <- merge(beer, brewery, by.x = "brewery_id", by.y = "row.names")
+merg <- na.omit(merg)
+
+ggplotly(ggplot(merg, aes(x = ibu, y = abv)) + 
+  geom_point() + 
+  geom_smooth() +
+  labs(x = "ibu", y = "abv", title = "abv by ibu"))
+
+```
+
+
+```{r echo=FALSE,fig.width=14}            
+merg$ounces <- as.factor(merg$ounces)
+qplot(ibu, abv, data = merg, color = ounces)
+
+```
+
+
+```{r echo=FALSE,fig.width=14}            
+kable(merg %>% 
+  group_by(style) %>% 
+  summarise(style_count = n(), mean_abv = mean(abv), mean_ibu = mean(ibu)) %>% 
+  arrange(desc(style_count)))
+```
+
+
+```{r echo=FALSE,fig.width=14}            
+merg.filter <- merg %>% 
+  group_by(style) %>%
+  mutate(style_count = n()) %>% 
+  filter(style_count >= 10)
+
+merg.filter %>% 
+  ggplot(aes(x = fct_reorder(style, abv, .fun = median, .desc = TRUE, ), y = abv)) + 
+  geom_boxplot(color = "darkblue", fill = "darkblue", alpha = 0.1, lwd = 0.8, fatten = 1) + 
+  theme(axis.text.x = element_text(angle = 50, hjust = 1, face = "bold"),
+        axis.text.y = element_text(angle = 50, hjust = 1, face = "bold")) + 
+  geom_point(color = "darkblue", size = 1, alpha = 0.1) +
+  labs(x = "Style (n > 10)", y = "ABV", title = "ABV by Style (n > 10)")
+
+
+merg.filter %>% 
+  ggplot(aes(x = fct_reorder(style, ibu, .fun = median, .desc = TRUE, ), y = ibu)) + 
+  geom_boxplot(color = "darkblue", fill = "darkblue", alpha = 0.1, lwd = 0.8, fatten = 1) + 
+  theme(axis.text.x = element_text(angle = 50, hjust = 1, face = "bold"),
+        axis.text.y = element_text(angle = 50, hjust = 1, face = "bold")) + 
+  geom_point(color = "darkblue", size = 1, alpha = 0.1) +
+  labs(x = "Style (n > 10)", y = "IBU", title = "IBU by Style (n > 10)")
+
+
+
+
+```
+
+
+
+
+
+# task 2
+
+```{r echo=FALSE}
+kable(merg %>% 
+  group_by(state) %>% 
+  summarise(brewery_number = n_distinct(name.y), mean_abv = mean(abv), mean_ibu = mean(ibu)) %>% 
+  arrange(desc(brewery_number)))
+
+```
+
+```{r echo=FALSE}
+attach(merg)
+agg_data <- aggregate(merg, by = list(state), FUN = mean, na.rm = TRUE)
+
+
+# creating the sunburst chart for abv
+attach(agg_data)  
+abv_bc <- ggplot(agg_data, aes(Group.1, abv))
+abv_bc + geom_bar(stat = "identity", aes(fill = abv)) + scale_fill_gradient(low = "blue", high = "red")+
+  coord_polar() + theme_minimal() + ylab("Mean ABV") + xlab("State")
+
+# creating the sunburst chart for ibu
+ibu_bc <- ggplot(agg_data, aes(Group.1, ibu))
+ibu_bc + geom_bar(stat = "identity", aes(fill = ibu)) + scale_fill_gradient(low = "blue", high = "red")+
+  coord_polar() + theme_minimal() + ylab("Mean IBU") + xlab("State")
+
+
+
+```
+
+# task 3
+```{r echo=FALSE}
+beer_abv <- subset(merg,!(is.na(merg$abv))) 
+beer_abv$style <- as.factor(beer_abv$style)
+beer_abv$style_number <- as.numeric(beer_abv$style)
+
+
+
+```
+
+
+```{r echo=FALSE}
+linear <- train(abv ~ ibu + ounces, 
+                      data = beer_abv, 
+                      method = "lm", 
+                      trControl = trainControl(method = "cv", number = 10)) 
+
+print(linear)
+
+```
+
+
+
+```{r echo=FALSE}
+beer_abv %>% 
+  mutate(linear_predictions = predict(linear, beer_abv)) %>% 
+  ggplot(aes(linear_predictions, abv, col = abv > 0.10)) + 
+  geom_point(color = "darkblue", alpha = 0.5, shape = 1, size = 1) + 
+  theme_minimal()+
+  geom_abline()  
+  
+summary(linear)
+```
+
+
+
+
+# knn
+```{r echo=FALSE}
+#knn_train <- na.omit(train)
+#knn_train <- select(knn_train, abv, ibu, style_number)
+
+
+#Build clusters using kmeans
+#set.seed(4556)
+#knn <- kmeans(knn_train, 5, nstart=25) 
+#aggregate(knn_train, by = list(fit$cluster), FUN = mean)
+#mydata2 <- data.frame(knn_train, fit$cluster) 
+#clusplot(mydata2, fit$cluster, color=TRUE, shade=TRUE, labels=2, lines=0)
+
+```
+
+
+#random forest
+```{r echo=FALSE}
+set.seed(1)
+rf <- train(abv ~ ibu + ounces, 
+               data = beer_abv, 
+               method = 'ranger', 
+               trControl = trainControl(method = 'cv', number = 10, verboseIter = TRUE))
+print(rf)
+```
+
+
+```{r echo=FALSE}
+beer_abv %>% 
+  mutate(rf_predictions = predict(rf, beer_abv)) %>% 
+  select(abv, ibu, ounces, rf_predictions) %>% 
+  ggplot(aes(rf_predictions, abv, col = abv > 0.10)) + 
+  geom_point(color = "darkblue", alpha = 0.5, shape = 1, size = 1) + 
+  geom_abline() + 
+  theme_minimal()
+```

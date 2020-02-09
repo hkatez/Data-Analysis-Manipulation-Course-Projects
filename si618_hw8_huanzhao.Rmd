@@ -1,0 +1,81 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+SI 618 Homework 8
+=====================
+
+## Getting Data from SQLite Database (10 points)
+
+In the data preparation step, a SQLite database has been created and populated with vehicle data. Now the data in the database is retrieved using R package DBI and RSQLite and stored in a data frame named vehicles. Here are the first 10 rows of the data frame, and the summary. 
+
+```{r echo=FALSE}
+library(DBI) 
+library(RSQLite)
+library(ggplot2)
+library(plyr)
+
+dbdriver = dbDriver("SQLite")
+connect = dbConnect(dbdriver, dbname = "vehicles.db")
+vehicles = dbGetQuery(connect, "select * from vehicle")
+vehicles = na.omit(vehicles)
+
+#Enter your code here to produce the first 10 row and summary
+head(vehicles,10)
+summary(vehicles)
+
+
+```
+
+## Converting to Factors (10 points)
+
+To make downstream analysis easier, we convert the data in columns vehicles\$make, vehicles\$VClass, vehicles\$cylinders, and vehicles\$trany into factors. Here is the summary of the data frame after the conversion. 
+
+```{r echo=FALSE}
+
+vehicles$make<-as.factor(vehicles$make)
+vehicles$VClass<-as.factor(vehicles$VClass)
+vehicles$cylinders<-as.factor(vehicles$cylinders)
+vehicles$trany<-as.factor(vehicles$trany)
+
+summary(vehicles)
+
+```
+
+## Filter Down Data (30 points)
+
+We will filter down the data such that only 'VClass' with more than 40 vehicles are kept. Here is the summary of the data frame after this subsetting step. 
+
+```{r echo=FALSE}
+library(data.table)
+ct_VClass = setDT(vehicles)[, .N, keyby=VClass]
+VClass_t = ct_VClass[ct_VClass$N > 40]$VClass
+morethan40_vehicles = vehicles[vehicles$VClass %in% VClass_t]
+
+#setcolorder(morethan40_vehicles, c(2,3,4,1,5,6,7,8,9,10))
+
+summary(morethan40_vehicles)
+
+```
+
+## Fuel Economy of Vehicles of Different Makes (50 points)
+
+For each vehicle class in filtered down data, we plot the mean combined MPG (average of data in vehicles\$comb08) for each vehicle maker every year. And then, we compute the mean combined MPG in all years for each vehicle maker, and plot it. Both charts are created with ggplot(). Note how the vehicle makers are ranked in the second plot. Use **fig.width=16**. To suppress messages from ggplot regarding groups with only one observation, set **warning=FALSE, message=FALSE** (we recommend setting this option only once your code is complete).
+
+```{r echo=FALSE, fig.width=16, message=FALSE, warning=FALSE}
+cls_vehicle <-  as.character(unique(morethan40_vehicles$VClass))
+
+for (class in cls_vehicle){
+  
+  df1 <- morethan40_vehicles[VClass == class, .(mean_combined_mpg = mean(comb08)) , by =.(make, year)]
+  line = ggplot(df1, aes(year,mean_combined_mpg, color = make)) + geom_line() + ggtitle(class) + xlab('Year') + ylab('Mean Combined MPG') 
+  print(line)
+  
+  df2 <- morethan40_vehicles[VClass == class, .(avg_combined_mpg = mean(comb08)) , by = make]
+  bar = ggplot(df2,aes( x = reorder(make, -avg_combined_mpg), y = avg_combined_mpg) )+ geom_col(alpha = 0.8) + ggtitle(class) + xlab('Make') + ylab('Main Combined MPG in All Years') + theme(axis.text.x = element_text(angle = 90, hjust =1))
+  print(bar)
+
+}
+
+```
